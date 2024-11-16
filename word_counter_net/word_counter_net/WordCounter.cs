@@ -7,7 +7,6 @@ public class WordCounter
 {
     public int CountWordOccurrencesInFileThreads(byte[] file, string wordToFind, int numThreads)
     {
-        // Read the file into memory as a string
         string fileContent = Encoding.UTF8.GetString(file);
         string[] lines = fileContent.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
 
