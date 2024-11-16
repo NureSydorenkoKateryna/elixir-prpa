@@ -5,25 +5,27 @@ namespace word_counter_net;
 
 public class WordCounter
 {
-    public int CountWordOccurrencesInFileThreads(byte[] fileBytes, string wordToFind, int numThreads)
+    public int CountWordOccurrencesInFileThreads(byte[] file, string wordToFind, int numThreads)
     {
-        int fileSize = fileBytes.Length;
-        int chunkSize = fileSize / numThreads;
-        int numChunks = numThreads;
+        // Read the file into memory as a string
+        string fileContent = Encoding.UTF8.GetString(file);
+        string[] lines = fileContent.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
 
+        int numChunks = numThreads;
+        int chunkSize = (int)Math.Ceiling((double)lines.Length / numThreads);
         var results = new int[numChunks];
 
         Thread[] threads = new Thread[numChunks];
 
         for (int chunkIndex = 0; chunkIndex < numChunks; chunkIndex++)
         {
-            int index = chunkIndex; 
+            int index = chunkIndex;
             threads[index] = new Thread(() =>
             {
                 int start = index * chunkSize;
-                int length = Math.Min(chunkSize, fileSize - start);
+                int end = Math.Min((index + 1) * chunkSize, lines.Length);
 
-                results[index] = CountWordOccurrencesInChunk(fileBytes, start, length, wordToFind);
+                results[index] = CountWordOccurrencesInLines(lines, start, end, wordToFind);
             });
 
             threads[index].Start();
@@ -37,29 +39,38 @@ public class WordCounter
         return results.Sum();
     }
 
-    public int CountWordOccurrencesInFileParallel(byte[] fileBytes, string wordToFind, int numThreads)
+    public int CountWordOccurrencesInFileParallel(byte[] file, string wordToFind, int numThreads)
     {
-        int fileSize = fileBytes.Length;
-        var chunkSize = (int)Math.Ceiling((double)fileSize / numThreads);
-        int numChunks = numThreads;
+        string fileContent = Encoding.UTF8.GetString(file);
+        string[] lines = fileContent.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
 
-        var results = new int[numThreads];
+        int chunkSize = (int)Math.Ceiling((double)lines.Length / numThreads);
+        int numChunks = numThreads;
+        var results = new int[numChunks];
 
         Parallel.For(0, numChunks, new ParallelOptions { MaxDegreeOfParallelism = numThreads }, chunkIndex =>
         {
-            var start = chunkIndex * chunkSize;
-            var length = Math.Min(chunkSize, fileSize - start);
-            results[chunkIndex] = CountWordOccurrencesInChunk(fileBytes, start, length, wordToFind);
+            int start = chunkIndex * chunkSize;
+            int end = Math.Min((chunkIndex + 1) * chunkSize, lines.Length);
+
+            results[chunkIndex] = CountWordOccurrencesInLines(lines, start, end, wordToFind);
         });
 
         return results.Sum();
     }
 
-    private int CountWordOccurrencesInChunk(byte[] fileBytes, int start, int length, string wordToFind)
+    private int CountWordOccurrencesInLines(string[] lines, int start, int end, string wordToFind)
     {
-        string chunkText = Encoding.UTF8.GetString(fileBytes, start, length);
+        string wordPattern = $@"\b{Regex.Escape(wordToFind)}\b";
+        Regex wordRegex = new Regex(wordPattern, RegexOptions.IgnoreCase);
 
-        Regex wordRegex = new Regex($@"\b{Regex.Escape(wordToFind)}\b", RegexOptions.IgnoreCase);
-        return wordRegex.Matches(chunkText).Count;
+        int count = 0;
+        for (int i = start; i < end; i++)
+        {
+            string line = lines[i];
+            count += wordRegex.Matches(line).Count;
+        }
+
+        return count;
     }
 }
